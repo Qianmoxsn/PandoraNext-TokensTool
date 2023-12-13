@@ -23,32 +23,54 @@
         />
       </el-menu-item>
       <div class="flex-grow" />
-      <el-menu-item index="1">
-        <a href="https://github.com/Yanyutin753/PandoraNext-TokensTool"
-          >TokensTool地址</a
+      <el-menu-item index="1" @click="getPoolToken">PoolToken列表</el-menu-item>
+      <el-sub-menu index="2">
+        <template #title>获取token地址</template>
+
+        <el-menu-item index="2-1">
+          <a href="https://ai.fakeopen.com/auth"
+            >PandoraNext地址</a
+          ></el-menu-item
         >
-      </el-menu-item>
-      <el-menu-item index="2">
-        <a href="https://chat.openai.com/api/auth/session">OpenAI官网</a>
-      </el-menu-item>
-      <el-menu-item index="3">
-        <a href="https://github.com/pandora-next/deploy">Pandora地址</a>
-      </el-menu-item>
+        <el-menu-item index="2-2">
+          <a
+            href="https://chat.openai.com/api/auth/session"
+            >OpenAI官网</a
+          ></el-menu-item
+        >
+        <el-menu-item index="2-3">
+          <a href="https://github.com/Yanyutin753/PandoraNext-TokensTool"
+            >TokensTool地址</a
+          ></el-menu-item
+        >
+      </el-sub-menu>
       <el-sub-menu index="4">
         <template #title>系统设置</template>
-        <el-menu-item index="4-1" @click="openPandora"
-          >开启PandoraNext</el-menu-item
+        <el-menu-item index="4-1" @click="onRequireSetting(pandoraNext)"
+          >PandoraNext设置</el-menu-item
         >
-        <el-menu-item index="4-2" @click="closePandora"
-          >暂停PandoraNext</el-menu-item
+        <el-menu-item index="4-2" @click="onRequireSetting(tokensTool)"
+          >tokensTool设置</el-menu-item
         >
-        <el-menu-item index="4-3" @click="AgainPandora"
-          >重启PandoraNext</el-menu-item
+        <el-menu-item index="4-3" @click="onRequireSetting(validation)"
+          >验证码信息设置</el-menu-item
         >
-        <el-menu-item index="4-4" @click="onRequireSetting"
-          >修改PandoraNext的系统设置</el-menu-item
+      </el-sub-menu>
+      <el-sub-menu index="5">
+        <template #title>系统功能</template>
+        <el-menu-item index="5-1" @click="openPandora"
+          >开启{{ containerName }}</el-menu-item
         >
-        <el-menu-item index="4-5" @click="logout">退出登录</el-menu-item>
+        <el-menu-item index="5-2" @click="closePandora"
+          >暂停{{ containerName }}</el-menu-item
+        >
+        <el-menu-item index="5-3" @click="AgainPandora"
+          >重启{{ containerName }}</el-menu-item
+        >
+        <el-menu-item index="5-4" @click="reloadPandora"
+          >重载{{ containerName }}</el-menu-item
+        >
+        <el-menu-item index="5-8" @click="logout">退出登录</el-menu-item>
       </el-sub-menu>
     </el-menu>
     <div style="display: block; transform: translate(5vw, 2.5vh); width=95vw;">
@@ -63,7 +85,7 @@
             >
               TokensTool
             </span>
-            <el-tag>made by Yang</el-tag>
+            <el-tag>v0.4.8.1</el-tag>
           </div>
         </template>
       </el-page-header>
@@ -72,9 +94,10 @@
     <!-- 添加token按钮 -->
     <van-floating-bubble
       v-model:offset="offset_task"
-      axis="xy"
+      axis="lock"
       icon="add-o"
       @click="addToken"
+      class="addTokenButton"
     />
 
     <div class="under">
@@ -83,7 +106,7 @@
           style="
           display: flex;
           background= white;
-          margin: 0px 35px -17px 35px;
+          margin: 10px 35px -8px 35px;
         "
         >
           <van-search
@@ -93,14 +116,16 @@
             @search="onSearch"
           />
         </div>
-        <div style="display: flex; width: 71.5vw; transform: translateX(0.5vw)">
+        <div style="display: flex; width: 71vw; transform: translateX(0.5vw)">
           <!-- 数据表 -->
           <el-table
             v-loading="loading"
             :data="tableData"
-            style="width: 72vw"
-            height="610px"
+            style="width: 100%"
+            @selection-change="handleSelectionChange"
+            ref="multipleTableRef"
           >
+            <el-table-column type="selection" width="45" />
             <!-- Token名称表 宽150 -->
             <el-table-column label="名称" width="126">
               <template #default="scope">
@@ -132,7 +157,7 @@
             </el-table-column>
 
             <!-- token值表 宽480 -->
-            <el-table-column label="Token值" width="318">
+            <el-table-column label="Token值" width="270">
               <template #default="scope">
                 <el-popover
                   effect="light"
@@ -141,7 +166,7 @@
                   width="auto"
                 >
                   <template #default>
-                    <div>token: {{ scope.row.token }}</div>
+                    <div>token: {{ dataToken(scope.row.token) }}</div>
                   </template>
                   <template #reference>
                     <!-- 做了超过50加...的操作 -->
@@ -164,18 +189,14 @@
                     <div>注册时间：{{ scope.row.updateTime }}</div>
                   </template>
                   <template #reference>
-                    <el-tag
-                      >距离过期还有：{{
-                        formatDate(scope.row.updateTime)
-                      }}</el-tag
-                    >
+                    <el-tag>距离过期还有：{{ formatDate(scope.row) }}</el-tag>
                   </template>
                 </el-popover>
               </template>
             </el-table-column>
 
             <!-- 操作方法表 宽300 方法handleEdit-->
-            <el-table-column label="操作方法" width="268">
+            <el-table-column label="操作方法" width="335">
               <!-- 编辑操作按钮 -->
               <template #default="scope">
                 <el-button
@@ -204,28 +225,35 @@
                 <el-button size="small" type="success" @click="reNew(scope.row)"
                   >刷新</el-button
                 >
+
+                <!-- 刷新操作按钮 方法reNew-->
+                <el-button
+                  size="small"
+                  type="warning"
+                  @click="review(scope.row)"
+                  >生成</el-button
+                >
               </template>
             </el-table-column>
           </el-table>
+          <div style="display: flex; margin-top: 3vh"></div>
         </div>
-        <div style="display: flex; margin-top: 3vh"></div>
-      </div>
-
-      <div class="bottom-component">
-        <div style="text-align: center; transform: translateY(2.55vh)">
-          <h2>
-            欢迎大家来扩展
-            <a href="https://github.com/Yanyutin753/PandoraNext-TokensTool"
-              >pandoraNext-TokensTool v0.1.0
-            </a>
-            获取token
-            <a href="https://chat.openai.com/auth/session">官网地址 </a>
-            <a href="https://ai.fakeopen.com/auth">Pandora地址</a>
-          </h2>
+        <div style="margin: 15px; transform: translateX(23px)">
+          <el-button-group class="ml-4">
+            <el-button @click="toggleSelection()"><h1>全部取消</h1></el-button>
+            <el-button @click="getSelectedData"
+              ><h1>选中合成PoolToken</h1></el-button
+            >
+          </el-button-group>
+          <el-button class="my-button" @click="updateAllShareToken">
+            <h1>全部生成shareToken</h1>
+          </el-button>
         </div>
-        <br />
       </div>
     </div>
+    <br />
+    <br />
+    <br />
   </div>
   <!------------------------------------------------------------------------------------------------------>
 
@@ -265,31 +293,43 @@
               <van-switch active-color="#0ea27e" v-model="temShared" />
             </template>
           </van-field>
+          <div v-if="temShared == true">
+            <br />
+            <van-field name="switch" label="是否分享聊天记录">
+              <template #right-icon>
+                <van-switch
+                  active-color="#0ea27e"
+                  v-model="temShow_user_info"
+                />
+              </template>
+            </van-field>
+            <br />
+            <van-field name="switch" label="是否显示金光">
+              <template #right-icon>
+                <van-switch active-color="#0ea27e" v-model="temPlus" />
+              </template>
+            </van-field>
+          </div>
           <br />
-          <van-field name="switch" label="是否分享聊天记录">
+          <van-field name="switch" label="是否合成poolToken">
             <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="temShow_user_info" />
+              <van-switch active-color="#0ea27e" v-model="setPoolToken" />
             </template>
           </van-field>
-          <br />
-          <van-field name="switch" label="是否显示金光">
-            <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="temPlus" />
-            </template>
-          </van-field>
-          <br />
-          <br />
-          <van-field
-            v-model="temPassword"
-            type="temPassword"
-            name="进入Token的密码"
-            label="进入Token的密码"
-            placeholder="进入Token的密码(选填)"
-          />
+          <div v-if="temShared == false">
+            <br />
+            <van-field
+              v-model="temPassword"
+              type="temPassword"
+              name="进入Token的密码"
+              label="进入Token的密码"
+              placeholder="填了将不会分享给他人！"
+            />
+          </div>
           <br />
           <van-field
             v-model="temToken"
-            rows="5"
+            rows="8"
             label="OpenAi的Token"
             type="textarea"
             maxlength="5000"
@@ -312,11 +352,12 @@
   <!-- 添加token信息 主键 名称为show_1 -->
   <van-dialog
     v-model:show="show_1"
-    title="token信息"
+    title="添加token信息"
     width="50vw"
     :close-on-click-overlay="true"
     :show-cancel-button="false"
     :show-confirm-button="false"
+    class="addTokenDialog"
   >
     <div style="display: block">
       <van-form @submit="onAddToken()">
@@ -340,38 +381,64 @@
           <br />
           <van-field
             v-model="addUserPassword"
-            type="temUserPassword"
+            type="password"
             name="OpenAi密码"
             label="OpenAi密码"
             placeholder="OpenAi密码"
             :rules="[{ required: true, message: '请填写OpenAi密码' }]"
           />
           <br />
-          <van-field name="switch" label="是否分享出来">
-            <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="addShared" />
-            </template>
-          </van-field>
-          <br />
-          <van-field name="switch" label="是否分享聊天记录">
-            <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="addShow_user_info" />
-            </template>
-          </van-field>
-          <br />
-          <van-field name="switch" label="是否显示金光">
-            <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="addPlus" />
-            </template>
-          </van-field>
-          <br />
           <van-field
-            v-model="addPassword"
-            type="temPassword"
-            name="进入Token的密码"
-            label="进入Token的密码"
-            placeholder="进入Token的密码"
+            rows="3"
+            type="textarea"
+            maxlength="5000"
+            show-word-limit
+            v-model="addTokenValue"
+            name="OpenAI的token"
+            label="OpenAI的token"
+            placeholder="选填(可不填,不填则使用账号密码)access token/session token/refresh token/share token"
           />
+          <br />
+          <div v-if="addPassword == ''">
+            <van-field name="switch" label="是否分享出来">
+              <template #right-icon>
+                <van-switch active-color="#0ea27e" v-model="addShared" />
+              </template>
+            </van-field>
+            <br />
+            <div v-if="addShared == true">
+              <van-field name="switch" label="是否分享聊天记录">
+                <template #right-icon>
+                  <van-switch
+                    active-color="#0ea27e"
+                    v-model="addShow_user_info"
+                  />
+                </template>
+              </van-field>
+              <br />
+              <van-field name="switch" label="是否显示金光">
+                <template #right-icon>
+                  <van-switch active-color="#0ea27e" v-model="addPlus" />
+                </template>
+              </van-field>
+            </div>
+          </div>
+          <br />
+          <van-field name="switch" label="是否合成poolToken">
+            <template #right-icon>
+              <van-switch active-color="#0ea27e" v-model="addSetPoolToken" />
+            </template>
+          </van-field>
+          <div v-if="addShared == ''">
+            <br />
+            <van-field
+              v-model="addPassword"
+              type="temPassword"
+              name="进入Token的密码"
+              label="进入Token的密码"
+              placeholder="填了将不会分享给他人！"
+            />
+          </div>
           <br />
         </van-cell-group>
         <div style="margin: 5.2px">
@@ -404,7 +471,6 @@
             name="Token用户名"
             label="Token用户名"
             placeholder="Token用户名"
-            :rules="[{ required: true, message: '请填写Token用户名' }]"
           />
           <br />
           <van-field
@@ -412,33 +478,48 @@
             name="OpenAi用户名"
             label="OpenAi用户名"
             placeholder="OpenAi用户名"
-            :rules="[{ required: true, message: '请填写OpenAi用户名' }]"
           />
           <br />
           <van-field
             v-model="temUserPassword"
-            type="password"
             name="OpenAi密码"
             label="OpenAi密码"
             placeholder="OpenAi密码"
-            :rules="[{ required: true, message: '请填写OpenAi密码' }]"
           />
           <br />
-          <van-field name="temShared" label="是否分享出来">
+          <van-field name="temShared" :readonly="true" label="是否分享出来">
             <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="temShared" />
+              <van-switch disabled active-color="#0ea27e" v-model="temShared" />
             </template>
           </van-field>
           <br />
-          <van-field name="temShow_user_info" label="是否分享聊天记录">
+          <van-field
+            :readonly="true"
+            name="temShow_user_info"
+            label="是否分享聊天记录"
+          >
             <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="temShow_user_info" />
+              <van-switch
+                disabled
+                active-color="#0ea27e"
+                v-model="temShow_user_info"
+              />
             </template>
           </van-field>
           <br />
-          <van-field name="temPlus" label="是否显示金光">
+          <van-field :readonly="true" name="temPlus" label="是否显示金光">
             <template #right-icon>
-              <van-switch active-color="#0ea27e" v-model="temPlus" />
+              <van-switch disabled active-color="#0ea27e" v-model="temPlus" />
+            </template>
+          </van-field>
+          <br />
+          <van-field name="switch" label="是否合成poolToken">
+            <template #right-icon>
+              <van-switch
+                disabled
+                active-color="#0ea27e"
+                v-model="setPoolToken"
+              />
             </template>
           </van-field>
           <br />
@@ -453,10 +534,29 @@
           <van-field
             v-model="temToken"
             rows="5"
-            label="OpenAi的Token"
+            label="session_token"
             type="textarea"
             maxlength="5000"
             placeholder="请填写OpenAi的Token"
+            show-word-limit
+          />
+          <br />
+          <van-field
+            v-model="temAccessToken"
+            rows="4"
+            label="access_token"
+            type="textarea"
+            maxlength="5000"
+            placeholder="请填写OpenAi的access_token"
+            show-word-limit
+          />
+          <br />
+          <van-field
+            v-model="temShareToken"
+            label="share_token"
+            type="textarea"
+            maxlength="200"
+            placeholder="请填写OpenAi的share_token"
             show-word-limit
           />
           <br />
@@ -466,19 +566,26 @@
     </div>
   </van-dialog>
   <!------------------------------------------------------------------------------------------------------>
-    <!-- 修改系统设置信息 主键 名称为show_3 -->
-    <van-dialog
+  <!-- 修改系统设置信息 主键 名称为show_3 -->
+  <van-dialog
     v-model:show="show_3"
-    title="修改系统设置信息"
+    title="PandoraNext设置信息"
     width="50vw"
     :close-on-click-overlay="true"
     :show-cancel-button="false"
     :show-confirm-button="false"
-    class="requireSettingDialog"
+    class="requirePandora"
   >
     <div style="display: block">
-      <van-form @submit="RequireSetting">
+      <van-form @submit="RequireSetting(pandoraNext)">
         <van-cell-group inset>
+          <br />
+          <van-field
+            v-model="isolated_conv_title"
+            name="对话标题"
+            label="对话标题"
+            placeholder="隔离对话设置标题"
+          />
           <br />
           <van-field
             v-model="bing"
@@ -500,19 +607,33 @@
             </template>
           </van-field>
           <br />
+          <van-field name="switch" label="是否配置证书">
+            <template #right-icon>
+              <van-switch active-color="#0ea27e" v-model="enabled" />
+            </template>
+          </van-field>
+          <div v-if="enabled == true">
+            <br />
+            <van-field
+              v-model="cert_file"
+              name="证书文件"
+              label="证书文件"
+              placeholder="证书文件"
+            />
+            <br />
+            <van-field
+              v-model="key_file"
+              name="密钥文件"
+              label="密钥文件"
+              placeholder="密钥文件"
+            />
+          </div>
+          <br />
           <van-field
             v-model="proxy_url"
-            type="temPassword"
             name="代理服务URL"
             label="代理服务URL"
             placeholder="代理服务URL(选填)"
-          />
-          <br />
-          <van-field
-            v-model="site_password"
-            name="访问网站密码"
-            label="访问网站密码"
-            placeholder="访问网站密码(选填)"
           />
           <br />
           <van-field
@@ -533,6 +654,218 @@
     <br />
   </van-dialog>
   <!------------------------------------------------------------------------------------------------------>
+
+  <!-- 修改tokensTool系统设置信息 主键 名称为show_4 -->
+  <van-dialog
+    v-model:show="show_4"
+    title="tokensTool设置信息"
+    width="50vw"
+    :close-on-click-overlay="true"
+    :show-cancel-button="false"
+    :show-confirm-button="false"
+    class="requireSettingDialog"
+  >
+    <div style="display: block">
+      <van-form @submit="RequireSetting(tokensTool)">
+        <van-cell-group inset>
+          <br />
+          <van-field
+            v-model="loginUsername"
+            name="登录用户名"
+            label="登录用户名"
+            placeholder="tokensTool用户名"
+          />
+          <br />
+          <van-field
+            v-model="loginPassword"
+            name="登录密码"
+            label="登录密码"
+            placeholder="不少于8位，且同时包含数字和字母"
+            :rules="[{ validator: customValidator }]"
+          />
+          <br />
+          <van-field
+            v-model="proxy_api_prefix"
+            name="proxy接口前缀"
+            label="proxy接口前缀"
+            placeholder="proxy模式接口后缀，不少于8位，且同时包含数字和字母"
+            :rules="[{ validator: customValidator }]"
+          />
+          <br />
+          <van-field
+            v-model="autoToken_url"
+            name="proxy模式URL"
+            label="proxy模式URL"
+            placeholder="http(s)://(ip:port或者域名)/后缀，同公网服务器填default"
+          />
+          <br />
+          <van-field
+            v-model="setup_password"
+            name="重载服务密码"
+            label="重载服务密码"
+            placeholder="PandoraNext重载服务密码，不少于8位，且同时包含数字和字母"
+            :rules="[{ validator: customValidator }]"
+          />
+          <br />
+          <van-field
+            v-model="site_password"
+            name="访问密码"
+            label="访问密码"
+            placeholder="PandoraNext访问密码，建议开启访问密码"
+            :rules="[{ validator: sitePasswordValidator }]"
+          />
+          <br />
+          <van-field
+            v-model="license_id"
+            name="验证licenseId"
+            label="验证licenseId"
+            placeholder="验证licenseId(github上拿到的license_id)"
+          />
+          <!-- 0.4.8.1 -->
+          <br />
+          <van-field name="switch" label="tokensTool接口">
+            <template #right-icon>
+              <van-switch active-color="#0ea27e" v-model="isGetToken" />
+            </template>
+          </van-field>
+          <div v-if="isGetToken == true">
+            <br />
+            <van-field
+              v-model="getTokenPassword"
+              name="接口密码"
+              label="接口密码"
+              placeholder="tokensTool接口密码，用于获取tokens,不少于8位，且同时包含数字和字母"
+              :rules="[{ validator: customValidator }]"
+            />
+          </div>
+          <br />
+          <van-field
+            v-model="containerName"
+            name="监管容器名"
+            label="监管容器名"
+            placeholder="监管运行的容器名或文件名，默认为PandoraNext"
+            :rules="[{ required: true, message: '请填写监管的容器名' }]"
+          />
+          <br />
+        </van-cell-group>
+        <div style="margin: 5.2px">
+          <van-button round block color="#0ea27e" native-type="submit">
+            提交
+          </van-button>
+        </div>
+      </van-form>
+    </div>
+    <br />
+  </van-dialog>
+
+  <!------------------------------------------------------------------------------------------------------>
+  <!------------------------------------------------------------------------------------------------------>
+
+  <!-- 修改PandoraNext验证信息信息 主键 名称为show_5 -->
+  <van-dialog
+    v-model:show="show_5"
+    title="PandoraNext验证信息"
+    width="50vw"
+    :close-on-click-overlay="true"
+    :show-cancel-button="false"
+    :show-confirm-button="false"
+    class="verify"
+  >
+    <div style="display: block">
+      <van-form @submit="RequireSetting(validation)">
+        <van-cell-group inset>
+          <br />
+          <van-field
+            v-model="provider"
+            name="验证码提供商"
+            label="验证码提供商"
+            placeholder="验证码提供商"
+          />
+          <br />
+          <van-field
+            v-model="site_key"
+            name="验证码网站参数"
+            label="验证码网站参数"
+            placeholder="验证码网站参数"
+          />
+          <br />
+          <van-field
+            v-model="site_secret"
+            name="验证码API Key"
+            label="验证码API Key"
+            placeholder="验证码API Key"
+          />
+          <br />
+          <van-field name="switch" label="是否全站密码登录页面显示">
+            <template #right-icon>
+              <van-switch active-color="#0ea27e" v-model="site_login" />
+            </template>
+          </van-field>
+          <br />
+          <van-field name="switch" label="是否在设置登录页面显示">
+            <template #right-icon>
+              <van-switch active-color="#0ea27e" v-model="setup_login" />
+            </template>
+          </van-field>
+          <br />
+          <van-field name="switch" label="是否在输入用户名页面显示">
+            <template #right-icon>
+              <van-switch active-color="#0ea27e" v-model="oai_username" />
+            </template>
+          </van-field>
+          <br />
+          <van-field name="switch" label="是否在输入密码页面显示">
+            <template #right-icon>
+              <van-switch active-color="#0ea27e" v-model="oai_password" />
+            </template>
+          </van-field>
+          <br />
+        </van-cell-group>
+        <div style="margin: 5.2px">
+          <van-button round block color="#0ea27e" native-type="submit">
+            提交
+          </van-button>
+        </div>
+      </van-form>
+    </div>
+    <br />
+  </van-dialog>
+  <!------------------------------------------------------------------------------------------------------>
+
+  <!-- poolToken信息 主键 名称为show_6 -->
+  <el-dialog
+    v-model="show_6"
+    title="pool_token列表"
+    align-center
+    width="75%"
+    :close-on-click-modal="false"
+    class="poolTokenDialog"
+  >
+    <el-table :data="poolData">
+      <el-table-column property="poolName" label="pool_token名称" width="200" />
+      <el-table-column property="poolToken" label="pool_token值" width="445" />
+      <el-table-column property="shareTokens" label="使用token名集合" width="375" />
+      <el-table-column property="poolTime" label="更新时间" width="230" />
+      <el-table-column label="操作方法" width="255">
+        <!-- 编辑操作按钮 -->
+        <template #default="scope">
+          <el-button
+            size="small"
+            type="danger"
+            @click="deletePoolToken(scope.$index, scope.row)"
+            >删除</el-button
+          >
+          <el-button size="small" type="success" @click="reNewPool(scope.row)"
+            >刷新</el-button
+          >
+          <el-button size="small" type="primary" @click="reviewPool(scope.row)"
+            >更换</el-button
+          >
+        </template>
+      </el-table-column>
+    </el-table>
+  </el-dialog>
+  <!------------------------------------------------------------------------------------------------------>
 </template>
 
 <script lang="ts" setup>
@@ -545,17 +878,90 @@ import png from "../asserts/chatGpt.jpg";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { differenceInDays, parseISO } from "date-fns";
 import { ElLoading } from "element-plus";
+import { ElTable } from "element-plus";
 
-const loading = ref(true);
-//加载状态
+const multipleTableRef = ref<InstanceType<typeof ElTable>>();
+const multipleSelection = ref<User[]>([]);
+const toggleSelection = (rows?: User[]) => {
+  multipleTableRef.value!.clearSelection();
+};
+const handleSelectionChange = (val: User[]) => {
+  multipleSelection.value = val;
+};
+const getSelectedData = async () => {
+  const selectedData = multipleSelection.value;
+
+  if (selectedData.length === 0) {
+    ElMessage("未选择数据");
+    return;
+  }
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      "请为这个pool_token取一个名字:",
+      "🥰温馨提示",
+      {
+        confirmButtonText: "生成pool_token",
+        cancelButtonText: "取消",
+        inputPattern: /^[\u4e00-\u9fa5a-zA-Z0-9]{5,10}$/,
+        inputErrorMessage: "此项不少于5个字符且不超过10个字符，可以包括汉字、字母和数字"
+      }
+    );
+
+    const names = selectedData.map((userData) => userData.name);
+
+    const addPoolToken = {
+      poolName: value,
+      shareTokens: names,
+    };
+
+    const response = await fetch("/api/addPoolToken", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(addPoolToken),
+    });
+    const loadingInstance = ElLoading.service({ fullscreen: true });
+
+    const data = await response.json();
+
+    if (data.code === 1) {
+      onSearch("");
+      ElMessage({
+        type: "success",
+        message: `生成pool_token成功，快去pool_token列表查看吧！`,
+      });
+    } else {
+      ElMessage({
+        type: "info",
+        message: "生成pool_token失败，请确保配置是否正确！",
+      });
+    }
+
+    loadingInstance.close();
+  } catch (error) {
+    ElMessage({
+      type: "info",
+      message: "取消生成pool_token",
+    });
+  }
+};
+
+
+//pandoraNext 为 0
+const pandoraNext = 0;
+//tokensTool 为 0
+const tokensTool = 1;
+//验证信息
+const validation = 2;
 
 /**
  * router 切换页面
  */
 const router = useRouter();
-if (window.innerWidth <= 700) {
-  router.replace("/iphone");
-}
+
 /**
  *   <!-- 添加token信息 主键 名称为show_1 -->
  *   <!-- 添加token信息 主键 名称为show_1 -->
@@ -566,6 +972,9 @@ const show = ref(false);
 const show_1 = ref(false);
 const show_2 = ref(false);
 const show_3 = ref(false);
+const show_4 = ref(false);
+const show_5 = ref(false);
+const show_6 = ref(false);
 
 //页头图片 image
 const image = png;
@@ -576,38 +985,109 @@ const image = png;
 interface User {
   name: string;
   token: string;
+  access_token: string;
+  share_token: string;
   username: string;
   userPassword: string;
   shared: boolean;
   show_user_info: boolean;
   plus: boolean;
+  setPoolToken: boolean;
   password: string;
   updateTime: string;
 }
 
 /**
+ * 定义Pool类接口
+ */
+interface Pool {
+  poolName: string;
+  shareTokens: string;
+  poolToken: string;
+  poolTime: string;
+}
+
+/**
  * 修改系统设置信息
  */
- const bing = ref("");
+const proxy_api_prefix = ref("");
+const isolated_conv_title = ref("*");
+const bing = ref("");
 const timeout = ref("");
 const proxy_url = ref("");
 const public_share = ref(false);
+
+const enabled = ref(false);
+const cert_file = ref("");
+const key_file = ref("");
+
 const site_password = ref("");
+const setup_password = ref("");
+const loginUsername = ref("");
+const loginPassword = ref("");
+const license_id = ref("");
+
+//0.4.8.1
+const isGetToken = ref(false);
+const getTokenPassword = ref("");
+
+const containerName = ref("PandoraNext");
+const autoToken_url = ref("default");
 const whitelist = ref("");
 
+const provider = ref("");
+const site_key = ref("");
+const site_secret = ref("");
+const site_login = ref(false);
+const setup_login = ref(false);
+const oai_username = ref(false);
+const oai_password = ref(false);
 
+// 0.4.8
+const poolName = ref("");
+const shareTokens = ref("");
+const poolToken = ref("");
+const poolTime = ref("");
+
+// 自定义校验函数，直接返回错误提示
+const customValidator = (value: string) => {
+  // 至少8位，包含数字和字母
+  const regex = /^(?=.*\d)(?=.*[a-zA-Z]).{8,}$/;
+
+  if (regex.test(value)) {
+    return true;
+  } else {
+    return "此项至少要包含8位且必须包含数字和字母";
+  }
+};
+
+const sitePasswordValidator = (value: string) => {
+  // 至少8位，包含数字和字母
+  const regex = /^(?=.*\d)(?=.*[a-zA-Z]).{8,}$/;
+
+  if (regex.test(value) || value == "") {
+    return true;
+  } else {
+    return "此项至少要包含8位且必须包含数字和字母";
+  }
+};
 /**
  * 查看或者修改token信息参数
  */
 const temName = ref("");
 const temToken = ref("");
+const temAccessToken = ref("");
+const temShareToken = ref("");
 const temUsername = ref("");
 const temUserPassword = ref("");
 const temShared = ref(false);
 const temShow_user_info = ref(false);
 const temPlus = ref(false);
-const temPassword = ref();
+const temPassword = ref("");
+const setPoolToken = ref(false);
 const tableData = ref<User[]>([]);
+// 0.4.8
+const poolData = ref<Pool[]>([]);
 
 /**
  * 添加用户信息参数
@@ -615,17 +1095,19 @@ const tableData = ref<User[]>([]);
 const addName = ref("");
 const addUsername = ref("");
 const addUserPassword = ref("");
+const addTokenValue = ref("");
 const addShared = ref(false);
 const addShow_user_info = ref(false);
 const addPlus = ref(false);
-const addPassword = ref();
+const addSetPoolToken = ref(false);
+const addPassword = ref("");
 
 /**
  * 控制悬浮球位置
  * 单位%
  */
 
-var y = window.innerHeight * 0.11;
+var y = window.innerHeight * 0.115;
 var x = window.innerWidth * 0.842;
 
 const iconSize = ref(window.innerHeight * 0.1);
@@ -672,7 +1154,6 @@ const fetchLoginToken = () => {
 
 const onSearch = (value: string) => {
   fetchDataAndFillForm(value);
-  loading.value = false;
 };
 /**
  * 获取数据操作，并把数据返回到tableData
@@ -680,45 +1161,140 @@ const onSearch = (value: string) => {
  */
 const fetchDataAndFillForm = async (value: string) => {
   try {
-    const response = await axios.get(`/api/seleteToken?name=${value}`, {
-      headers,
-    });
-    const data = response.data.data;
-    console.log(data);
+    const response = await axios.get(
+      `/api/selectToken?name=${value}`,
+      {
+        headers,
+      }
+    );
+    const data_token = response.data.data;
+    console.log(data_token);
 
     // 如果服务器返回的数据是一个数组，你可以遍历数据并将每个对象转化为User类型
-    if (Array.isArray(data)) {
-      const resUsers: User[] = data.map((item: User) => ({
+    if (Array.isArray(data_token)) {
+      const resUsers: User[] = data_token.map((item: User) => ({
         name: item.name,
         username: item.username,
         userPassword: item.userPassword,
         token: item.token,
+        access_token: item.access_token,
+        share_token: item.share_token,
         shared: item.shared,
         show_user_info: item.show_user_info,
         password: item.password,
         plus: item.plus,
+        setPoolToken: item.setPoolToken,
         updateTime: item.updateTime,
       }));
 
-      // 将用户数据添加到tableData
-      tableData.value = resUsers;
+      const responsePool = await axios.get(
+        `/api/selectPoolToken?name=${value}`,
+        {
+          headers,
+        }
+      );
+      const pool_token = responsePool.data.data;
+
+      // 如果服务器返回的数据是一个数组，你可以遍历数据并将每个对象转化为User类型
+      if (Array.isArray(pool_token)) {
+        const resPools: Pool[] = pool_token.map((item: Pool) => ({
+          poolName: item.poolName,
+          poolTime: item.poolTime,
+          poolToken: item.poolToken,
+          shareTokens: item.shareTokens,
+        }));
+
+        // 将用户数据添加到tableData
+        tableData.value = resUsers;
+        // 将用户数据添加到poolData
+        poolData.value = resPools;
+
+        const response = await axios.get(
+          `/api/selectSetting`,
+          {
+            headers,
+          }
+        );
+        const data = response.data.data;
+        console.log(data);
+        proxy_api_prefix.value = data.proxy_api_prefix;
+        isolated_conv_title.value = data.isolated_conv_title;
+        bing.value = data.bing;
+        timeout.value = data.timeout;
+        proxy_url.value = data.proxy_url;
+        public_share.value = data.public_share;
+
+        enabled.value = data.tls.enabled;
+        cert_file.value = data.tls.cert_file;
+        key_file.value = data.tls.key_file;
+
+        site_password.value = data.site_password;
+        setup_password.value = data.setup_password;
+        console.log(data.whitelist);
+        if (data.whitelist == null) {
+          whitelist.value = "null";
+        } else whitelist.value = data.whitelist;
+        loginUsername.value = data.loginUsername;
+        loginPassword.value = data.loginPassword;
+        license_id.value = data.license_id;
+
+        //0.4.8.1
+        isGetToken.value = data.isGetToken;
+        getTokenPassword.value = data.getTokenPassword;
+
+        containerName.value = data.containerName;
+        autoToken_url.value = data.autoToken_url;
+        provider.value = data.validation.provider;
+        site_key.value = data.validation.site_key;
+        site_secret.value = data.validation.site_secret;
+
+        site_login.value = data.validation.site_login;
+        setup_login.value = data.validation.setup_login;
+        oai_username.value = data.validation.oai_username;
+        oai_password.value = data.validation.oai_password;
+      }
     }
   } catch (error) {
     console.error("获取数据失败", error);
     ElMessage("获取数据失败");
   }
+  if (loginPassword.value == "123456" && loginUsername.value == "root") {
+    ElMessageBox.alert(
+      "请先修改默认的初始账号和密码，并填写相应的信息，具体可参考网站文档！",
+      "温馨提醒",
+      {
+        confirmButtonText: "OK",
+        callback: () => {
+          ElMessage({
+            type: "info",
+            message: "感谢Pandora大佬！",
+          });
+        },
+      }
+    );
+    loginPassword.value = "";
+    loginUsername.value = "";
+    show_4.value = true;
+  }
 };
 
 // 在组件加载完成后自动触发数据加载和填充
 onMounted(() => {
+  const loadingInstance = ElLoading.service({ fullscreen: true });
+  if (window.innerWidth <= 700) {
+    router.replace("/iphone");
+  }
   fetchLoginToken();
   onSearch(value.value);
+  loadingInstance.close();
 });
 
 /**
  * 用于用户信息设置
  */
 const activeIndex = ref("-1");
+
+let temRequireToken = "";
 const handleSelect = (key: string, keyPath: string[]) => {
   console.log(key, keyPath);
 };
@@ -728,11 +1304,14 @@ const handleEdit = (index: number, row: User) => {
   console.log(temName.value);
   temUsername.value = row.username;
   temUserPassword.value = row.userPassword;
+  //用来判断token是否更改
   temToken.value = row.token;
+  temRequireToken = row.token;
   temShared.value = row.shared;
   temShow_user_info.value = row.show_user_info;
   temPlus.value = row.plus;
   temPassword.value = row.password;
+  setPoolToken.value = row.setPoolToken;
   show.value = true;
 };
 
@@ -748,7 +1327,7 @@ const addToken = () => {
  * 添加token函数
  * 类user
  */
-const onAddToken = () => {
+ const onAddToken = () => {
   const loadingInstance = ElLoading.service({ fullscreen: true });
   const now: Date = new Date();
   const formattedTime = `${now.getFullYear()}-${(now.getMonth() + 1)
@@ -760,22 +1339,23 @@ const onAddToken = () => {
     .getSeconds()
     .toString()
     .padStart(2, "0")}`;
+  if (addPassword.value != "") {
+    addShared.value = false;
+    addShow_user_info.value = false;
+    addPlus.value = false;
+  }
   let api = {
     name: addName.value,
-    token: "",
+    token: addTokenValue.value,
     username: addUsername.value,
     userPassword: addUserPassword.value,
     shared: addShared.value,
     show_user_info: addShow_user_info.value,
     plus: addPlus.value,
+    setPoolToken: addSetPoolToken.value,
     password: addPassword.value,
     updateTime: formattedTime,
   };
-  if ((api.password === "" || api.password === null) && api.shared === true) {
-    ElMessage("shared的token是不能设置密码的，请重新再试！");
-    loadingInstance.close();
-    return;
-  }
   fetch("/api/addToken", {
     method: "POST",
     headers: {
@@ -788,26 +1368,31 @@ const onAddToken = () => {
     .then((data) => {
       if (data.code == 1) {
         console.log(data.data);
-        api.token = data.data as string;
-        tableData.value.unshift(api);
-        ElMessage("添加成功！");
+        if (api.token == "") {
+          api.token = data.data as string;
+          onSearch("");
+          addName.value = "";
+          addTokenValue.value = "";
+          addUsername.value = "";
+          addUserPassword.value = "";
+          addShared.value = false;
+          addShow_user_info.value = false;
+          addPlus.value = false;
+          addSetPoolToken.value = false;
+          addPassword.value = "";
+          ElMessage("添加成功！已为你自动装填token");
+        }
       } else {
         ElMessage(data.msg);
       }
+      loadingInstance.close();
     })
     .catch((error) => {
-      console.error("请求addToken接口失败", error);
-      ElMessage("添加失败！");
-      // 处理请求失败的情况
+      ElMessage("获取账号出现问题，请检查刷新网址是否正确！");
+      loadingInstance.close();
     });
-  temName.value = "";
-  temUsername.value = "";
-  temUserPassword.value = "";
-  temToken.value = "";
   show_1.value = false;
-  loadingInstance.close();
 };
-
 /**
  * 展示token函数
  * 类user
@@ -817,47 +1402,74 @@ const showData = (row: User) => {
   temUsername.value = row.username;
   temUserPassword.value = row.userPassword;
   temToken.value = row.token;
+  temAccessToken.value = row.access_token;
+  temShareToken.value = row.share_token;
   temShared.value = row.shared;
   temShow_user_info.value = row.show_user_info;
   temPlus.value = row.plus;
   temPassword.value = row.password;
+  setPoolToken.value = row.setPoolToken;
   show_2.value = true;
 };
 
 /**
  * 修改系统设置函数
  */
- const onRequireSetting = async () => {
-  const response = await axios.get(`/api/selectSetting`, {
-    headers,
-  });
-  const data = response.data.data;
-  console.log(data);
-  bing.value = data.bing;
-  timeout.value = data.timeout;
-  proxy_url.value = data.proxy_url;
-  public_share.value = data.public_share;
-  site_password.value = data.site_password;
-  console.log(data.whitelist);
-  if(data.whitelist == null){
-    whitelist.value = "null";
+const onRequireSetting = async (value: any) => {
+  if (value == 0) {
+    show_3.value = true;
+  } else if (value == 1) {
+    show_4.value = true;
+  } else if (value == 2) {
+    show_5.value = true;
   }
-  else whitelist.value = data.whitelist;
-  show_3.value = true;
 };
 
-const RequireSetting = () => {
+const RequireSetting = (value: any) => {
   const loadingInstance = ElLoading.service({ fullscreen: true });
-  if(whitelist.value == null || whitelist.value == "null"){
+  if (whitelist.value == null || whitelist.value == "null") {
     whitelist.value = "";
   }
+  if (enabled.value == false) {
+    cert_file.value = "";
+    key_file.value = "";
+  }
+  const tls = {
+    enabled: enabled.value,
+    cert_file: cert_file.value,
+    key_file: key_file.value,
+  };
+  const validation = {
+    provider: provider.value,
+    site_key: site_key.value,
+    site_secret: site_secret.value,
+    site_login: site_login.value,
+    setup_login: setup_login.value,
+    oai_username: oai_username.value,
+    oai_password: oai_password.value,
+  };
   const setting = {
+    proxy_api_prefix: proxy_api_prefix.value,
+    isolated_conv_title: isolated_conv_title.value,
     bing: bing.value,
     timeout: timeout.value,
     proxy_url: proxy_url.value,
     public_share: public_share.value,
     site_password: site_password.value,
+    setup_password: setup_password.value,
+    loginUsername: loginUsername.value,
+    loginPassword: loginPassword.value,
+    license_id: license_id.value,
+
+    //0.4.8.1
+    isGetToken: isGetToken.value,
+    getTokenPassword: getTokenPassword.value,
+
+    containerName: containerName.value,
+    autoToken_url: autoToken_url.value,
     whitelist: whitelist.value,
+    validation: validation,
+    tls: tls,
   };
 
   fetch("/api/requireSetting", {
@@ -874,15 +1486,25 @@ const RequireSetting = () => {
       if (data.code == 1) {
         console.log(data.data);
         ElMessage(data.data);
-      } 
-      else ElMessage(data.msg);
+      } else {
+        ElMessage(data.msg);
+      }
+      fetchLoginToken();
+      loadingInstance.close();
     })
     .catch((error) => {
+      loadingInstance.close();
       console.error("请求requireSetting接口失败", error);
       ElMessage("修改失败！");
     });
-  show_3.value = false;
-  loadingInstance.close();
+  console.log(value);
+  if (value == 0) {
+    show_3.value = false;
+  } else if (value == 1) {
+    show_4.value = false;
+  } else if (value == 2) {
+    show_5.value = false;
+  }
 };
 /**
  * 修改token函数
@@ -890,16 +1512,22 @@ const RequireSetting = () => {
  */
 const RequireToken = () => {
   const loadingInstance = ElLoading.service({ fullscreen: true });
-  const now: Date = new Date();
-  const formattedTime = `${now.getFullYear()}-${(now.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")} ${now
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now
-    .getSeconds()
-    .toString()
-    .padStart(2, "0")}`;
+  let formattedTime = "";
+  if (temRequireToken != temToken.value) {
+    const now: Date = new Date();
+    formattedTime = `${now.getFullYear()}-${(now.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")} ${now
+      .getHours()
+      .toString()
+      .padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now
+      .getSeconds()
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  if (temShared.value === true) {
+    temPassword.value = "";
+  }
   const api = {
     name: temName.value,
     token: temToken.value,
@@ -908,13 +1536,9 @@ const RequireToken = () => {
     shared: temShared.value,
     show_user_info: temShow_user_info.value,
     plus: temPlus.value,
+    setPoolToken: setPoolToken.value,
     password: temPassword.value,
   };
-  if ((api.password != "" || api.password === null) && api.shared === true) {
-    ElMessage("shared的token是不能设置密码的，请重新再试！");
-    loadingInstance.close();
-    return;
-  }
   fetch("/api/requiredToken", {
     method: "POST",
     headers: {
@@ -935,29 +1559,35 @@ const RequireToken = () => {
           if (tableData.value[i].name === temName.value) {
             tableData.value[i].token = api.token;
             tableData.value[i].username = api.username;
-            tableData.value[i].userPassword = api.password;
+            tableData.value[i].userPassword = api.userPassword;
             tableData.value[i].shared = api.shared;
             tableData.value[i].show_user_info = api.show_user_info;
             tableData.value[i].plus = api.plus;
+            tableData.value[i].setPoolToken = api.setPoolToken;
             tableData.value[i].password = api.password;
-            tableData.value[i].updateTime = formattedTime;
+            if (temRequireToken != temToken.value) {
+              tableData.value[i].updateTime = formattedTime;
+            }
             break; // 找到匹配的元素后跳出循环
           }
         }
-      } else ElMessage(data.msg);
+      } else {
+        ElMessage(data.msg);
+      }
+      loadingInstance.close();
     })
     .catch((error) => {
+      loadingInstance.close();
       console.error("请求requireToken接口失败", error);
       ElMessage("修改失败！");
     });
   show.value = false;
-  loadingInstance.close();
 };
 
 /**
  * 开启pandora函数
  */
- const openPandora = async () => {
+const openPandora = async () => {
   const loadingInstance = ElLoading.service({ fullscreen: true });
   const response = await axios.get(`/api/open`, {
     headers,
@@ -974,14 +1604,16 @@ const RequireToken = () => {
         });
       },
     });
-  } else ElMessage(response.data.msg);
+  } else {
+    ElMessage(response.data.msg);
+  }
   loadingInstance.close();
 };
 
 /**
  * 暂停pandora函数
  */
- const closePandora = async () => {
+const closePandora = async () => {
   const loadingInstance = ElLoading.service({ fullscreen: true });
   const response = await axios.get(`/api/close`, {
     headers,
@@ -998,7 +1630,9 @@ const RequireToken = () => {
         });
       },
     });
-  } else ElMessage(response.data.msg);
+  } else {
+    ElMessage(response.data.msg);
+  }
   loadingInstance.close();
 };
 
@@ -1022,7 +1656,62 @@ const AgainPandora = async () => {
         });
       },
     });
-  } else ElMessage(response.data.msg);
+  } else {
+    ElMessage(response.data.msg);
+  }
+  loadingInstance.close();
+};
+
+/**
+ * 重载pandora函数
+ */
+const reloadPandora = async () => {
+  const loadingInstance = ElLoading.service({ fullscreen: true });
+  const response = await axios.get(`/api/reload`, {
+    headers,
+  });
+  const data = response.data.data;
+  console.log(data);
+  if (data != null && data != "") {
+    ElMessageBox.alert(data, "温馨提醒", {
+      confirmButtonText: "OK",
+      callback: () => {
+        ElMessage({
+          type: "info",
+          message: "感谢Pandora大佬！",
+        });
+      },
+    });
+  } else {
+    ElMessage(response.data.msg);
+  }
+  loadingInstance.close();
+};
+
+/**
+ * 一键全生成
+ */
+const updateAllShareToken = async () => {
+  const loadingInstance = ElLoading.service({ fullscreen: true });
+  const response = await axios.get(`/api/updateAllToken`, {
+    headers,
+  });
+  const data = response.data.data;
+  console.log(data);
+  if (data != null && data != "") {
+    onSearch("");
+    ElMessageBox.alert(data, "温馨提醒", {
+      confirmButtonText: "OK",
+      callback: () => {
+        ElMessage({
+          type: "info",
+          message: "感谢Pandora大佬！",
+        });
+      },
+    });
+  } else {
+    ElMessage(response.data.msg);
+  }
   loadingInstance.close();
 };
 
@@ -1044,11 +1733,12 @@ const reNew = (row: User) => {
     password: row.password,
   };
 
-  fetch("/api/updateToken", {
+  fetch("/api/updateSessionToken", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`, // 确保 token 变量已定义
+      // 确保 token 变量已定义
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(api),
   })
@@ -1060,35 +1750,223 @@ const reNew = (row: User) => {
     })
     .then((data) => {
       if (data != null && data != "") {
-        row.token = data.data;
-
-        const now: Date = new Date();
-        const formattedTime = `${now.getFullYear()}-${(now.getMonth() + 1)
-          .toString()
-          .padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")} ${now
-          .getHours()
-          .toString()
-          .padStart(2, "0")}:${now
-          .getMinutes()
-          .toString()
-          .padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-
-        row.updateTime = formattedTime;
-        ElMessageBox.alert("更新成功!", "温馨提醒", {
-          confirmButtonText: "OK",
-          callback: () => {
-            ElMessage({
-              type: "info",
-              message: "感谢Pandora大佬！",
-            });
-          },
-        });
-      } else {
-        ElMessage(data.msg);
+        if (data.data != null) {
+          row.token = data.data;
+          onSearch("");
+          ElMessageBox.alert("刷新成功!", "温馨提醒", {
+            confirmButtonText: "OK",
+            callback: () => {
+              ElMessage({
+                type: "info",
+                message: "感谢Pandora大佬！",
+              });
+            },
+          });
+        } else {
+          ElMessage(data.msg);
+        }
       }
+      loadingInstance.close();
     })
     .catch((error) => {
+      loadingInstance.close();
       console.error("Error:", error);
+    });
+};
+
+/**
+ * 刷新Token函数
+ */
+const reNewPool = (row: Pool) => {
+  const loadingInstance = ElLoading.service({ fullscreen: true });
+  fetch("/api/refreshSimplyPoolToken", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // 确保 token 变量已定义
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(row),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (data != null && data != "") {
+        if (data.data != null) {
+          onSearch("");
+          ElMessageBox.alert("刷新成功!", "温馨提醒", {
+            confirmButtonText: "OK",
+            callback: () => {
+              ElMessage({
+                type: "info",
+                message: "感谢Pandora大佬！",
+              });
+            },
+          });
+        } else {
+          ElMessage(data.msg);
+        }
+      }
+      loadingInstance.close();
+    })
+    .catch((error) => {
+      loadingInstance.close();
+      console.error("Error:", error);
+    });
+};
+
+/**
+ * 更改token操作
+ */
+const review = (row: User) => {
+  const loadingInstance = ElLoading.service({ fullscreen: true });
+  const api = {
+    name: row.name,
+    token: row.token,
+    username: row.username,
+    userPassword: row.userPassword,
+    shared: row.shared,
+    show_user_info: row.show_user_info,
+    plus: row.plus,
+    password: row.password,
+  };
+
+  fetch("/api/updateToken", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // 确保 token 变量已定义
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(api),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (data != null && data != "") {
+        if (data.data != null) {
+          row.share_token = data.data.share_token;
+          row.access_token = data.data.access_token;
+          onSearch("");
+          ElMessageBox.alert("更新成功!", "温馨提醒", {
+            confirmButtonText: "OK",
+            callback: () => {
+              ElMessage({
+                type: "info",
+                message: "感谢Pandora大佬！",
+              });
+            },
+          });
+        } else {
+          ElMessage(data.msg);
+        }
+      }
+      loadingInstance.close();
+    })
+    .catch((error) => {
+      loadingInstance.close();
+      console.error("Error:", error);
+    });
+};
+
+/**
+ * 更新token操作
+ */
+const reviewPool = (row: Pool) => {
+  const loadingInstance = ElLoading.service({ fullscreen: true });
+  fetch("/api/changePoolToken", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // 确保 token 变量已定义
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(row),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (data != null && data != "") {
+        if (data.data != null) {
+          onSearch("");
+          ElMessageBox.alert("更换pool_token成功!", "温馨提醒", {
+            confirmButtonText: "OK",
+            callback: () => {
+              ElMessage({
+                type: "info",
+                message: "感谢Pandora大佬！",
+              });
+            },
+          });
+        } else {
+          ElMessage(data.msg);
+        }
+      }
+      loadingInstance.close();
+    })
+    .catch((error) => {
+      loadingInstance.close();
+      console.error("Error:", error);
+    });
+};
+
+/**
+ * 删除PoolToken函数
+ * 参数 Pool
+ */
+const deletePoolToken = (index: number, row: Pool) => {
+  const loadingInstance = ElLoading.service({ fullscreen: true });
+  let msg = "";
+  ElMessageBox.confirm(
+    "您确定要删除这个Pool_Token吗，删除之后就找不到咯，请您要仔细认真考虑哦！",
+    "温馨提示",
+    {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    }
+  )
+    .then(() => {
+      fetch("/api/deletePoolToken", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // 确保 token 变量已定义
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(row),
+      })
+        .then((response) => {
+          msg = "删除成功！";
+          // 从数组中移除商品项
+          poolData.value.splice(index, 1);
+          ElMessage({
+            type: "success",
+            message: msg,
+          });
+        })
+        .catch((error) => {
+          // 处理完成失败的逻辑
+          console.error("删除失败", error);
+        });
+    })
+    .catch(() => {
+      ElMessage({
+        type: "info",
+        message: "删除取消！",
+      });
     });
   loadingInstance.close();
 };
@@ -1137,24 +2015,30 @@ const deleteToken = (index: number, row: User) => {
     });
   loadingInstance.close();
 };
-
 /**
  * 获取token的过期时间
  */
-const formatDate = (value: string) => {
+const formatDate = (value: User) => {
   if (!value) return "";
   var nowDay = new Date();
-  const timeDay = parseISO(value);
+  const timeDay = parseISO(value.updateTime);
   const daysDiff = differenceInDays(nowDay, timeDay);
-  return daysDiff >= 10
-    ? "已经过去了至少10天"
-    : Math.ceil(10 - daysDiff) + "天";
+  if (value.token.length <= 2000) {
+    return daysDiff >= 10
+      ? "已经过去了至少10天"
+      : Math.ceil(10 - daysDiff) + "天";
+  } else {
+    return daysDiff >= 80
+      ? "已经过去了至少80天"
+      : Math.ceil(80 - daysDiff) + "天";
+  }
 };
+
 /**
  * 更改Token显示操作
  */
 const dataToken = (value: string) => {
-  return value.substring(0, 40) + "...";
+  return value.substring(0, 30) + "...";
 };
 
 /**
@@ -1165,6 +2049,10 @@ const logout = () => {
   localStorage.removeItem("jwtToken");
   // 使用 Vue Router 进行页面跳转到登录页面
   router.replace("/login");
+};
+
+const getPoolToken = () => {
+  show_6.value = true;
 };
 </script>
 
@@ -1194,15 +2082,16 @@ const logout = () => {
   flex-direction: column;
 }
 .van-dialog {
-  top: 55vh;
+  top: 50vh;
   height: auto;
 }
 .van-field__label {
-  width: 100px;
+  width: 120px;
+  font-size: 14.6px;
 }
 .el-table .cell {
   font-size: 14px;
-  line-height: 45px;
+  line-height: 47px;
 }
 .el-tag {
   font-size: 12.6px;
@@ -1240,23 +2129,42 @@ const logout = () => {
   font-size: 14px;
 }
 
-.requireDialog {
-  height: auto;
-}
-
 .requireTokenDialog {
   height: auto;
+  overflow-y: auto;
+  /* 显示垂直滚动条 */
+  overflow-x: hidden;
 }
 .addTokenDialog {
-  height: auto;
+  max-height: 75.3vh;
+  overflow-y: auto;
+  /* 显示垂直滚动条 */
+  overflow-x: hidden;
 }
 .showDialog {
+  max-height: 77.8vh;
+  overflow-y: auto;
+  /* 显示垂直滚动条 */
+  overflow-x: hidden;
+}
+.requirePandora {
+  max-height: 75.3vh;
+  overflow-y: auto;
+  /* 显示垂直滚动条 */
+  overflow-x: hidden;
+}
+.requireSettingDialog {
+  max-height: 75.3vh;
+  overflow-y: auto;
+  /* 显示垂直滚动条 */
+  overflow-x: hidden;
+}
+.verify {
   height: auto;
+  overflow-y: auto;
+  /* 显示垂直滚动条 */
+  overflow-x: hidden;
 }
-.van-field__label {
-  font-size: 10.6px;
-}
-
 /* 集合内框内字体颜色 */
 .el-tag {
   --el-tag-text-color: #0ea27e;
@@ -1265,7 +2173,7 @@ const logout = () => {
 
 /* 集合内各数据位置 */
 .el-table__inner-wrapper {
-  margin-left: 50px;
+  margin-left: 35px;
   margin-bottom: 7px;
   overflow: auto;
 }
@@ -1276,7 +2184,7 @@ a {
 }
 
 h2 {
-  font-size: 1.75vh;
+  font-size: 2vh;
   color: #606266;
   margin: 0px;
 }
@@ -1303,8 +2211,8 @@ h2 {
 
 .search {
   box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
-  transform: translate(14vw, 3.5vh);
-  width: 72vw;
+  transform: translate(12.5vw, 3.5vh);
+  width: 75vw;
   background: white;
   border-radius: 10px;
 }
@@ -1329,5 +2237,63 @@ h2 {
 .el-table {
   width: 95%;
   max-width: 100%;
+}
+
+.el-menu--popup {
+  z-index: 100;
+  min-width: auto;
+  border: none;
+  padding: 5px 0;
+  border-radius: var(--el-border-radius-small);
+  box-shadow: var(--el-box-shadow-light);
+}
+
+/* 选择框 */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #0ea27e;
+  border-color: #0ea27e;
+}
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background-color: #0ea27e;
+  border-color: #0ea27e;
+}
+.el-checkbox__inner:hover {
+    border-color: #0ea27e;
+}
+
+.poolTokenDialog {
+  max-height: 75.3vh;
+  overflow: auto;
+}
+
+h1 {
+  color: #0ea27e;
+  font-size: 14px;
+}
+
+.my-button {
+  margin-right: 3.8vw;
+  float: right;
+}
+
+.el-message-box__btns button:nth-child(2) {
+  --el-button-bg-color: #0ea27e;
+  --el-button-border-color: #0ea27e;
+  --el-button-outline-color: #0ea27e;
+  --el-button-active-color: #0ea27e;
+  --el-button-hover-bg-color: #0ea27e;
+  --el-button-hover-border-color: #0ea27e;
+  --el-button-active-bg-color: #0ea27e;
+  --el-button-active-border-color: #0ea27e;
+  --el-button-disabled-text-color: #0ea27e;
+  --el-button-disabled-bg-color: #0ea27e;
+  --el-button-disabled-border-color: var(--el-color-primary-light-5);
+  margin-left: 10px;
+}
+.el-input__wrapper.is-focus{
+  box-shadow: 0 0 0 1px #0ea27e inset;
+}
+.addTokenButton{
+  position : fixed;
 }
 </style>
